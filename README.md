@@ -1,8 +1,8 @@
 # mohair
 
-Mohair is a Unity Editor tool that uses Roslyn code analysis (only syntax, not semantic) to automatically scan your C# code for Yarn Spinner commands and functions, and produce Markdown + HTML documentation. 
+Mohair is a Unity Editor tool that uses Roslyn code analysis (only syntax, not semantic) to automatically scan your C# code for Yarn Spinner commands and functions, and produce Markdown + HTML documentation. It takes your Yarn Command or Yarn Function binding, and then pairs it with the underlying C# method and its associated code comments.
 
-It takes your Yarn Command or Yarn Function binding, then looks at the underlying C# method and its associated code comments and 
+This tool is intended for game developers who need to work with game writers and narrative designers, since non-programmers are unlikely to delve into the C# code to figure out what's happening. This way, any documentation you apply to your code (e.g. XML comments) is automatically paired with the equivalent Yarn command in an accessible document. It all just works in the background.
 
 (TODO: show example documentation)
 
