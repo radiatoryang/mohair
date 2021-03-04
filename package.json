@@ -1,0 +1,23 @@
+{
+  "name": "com.radiatoryang.mohair",
+  "version": "1.0.0",
+  "displayName": "Mohair",
+  "description": "Mohair is a Unity Editor tool that uses Roslyn code analysis (only syntax, not semantic) to automatically scan your C# code for Yarn Spinner commands and functions, and produce Markdown + HTML documentation. Requires Yarn Spinner v2.0+. For more info, see https://github.com/radiatoryang/mohair",
+  "unity": "2018.4",
+  "license": "MIT",
+  "dependencies": {
+	"com.unity.code-analysis": "0.1.2-preview"
+  },
+  "keywords": [
+    "Dialogue",
+	"Yarn",
+	"Yarn Spinner"
+  ],
+  "author": {
+    "name": "Robert Yang",
+	"email": "2285943+radiatoryang@users.noreply.github.com",
+    "url": "https://debacle.us"
+  },
+  "hideInEditor": false,
+  "type": "tool"
+}
