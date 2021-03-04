@@ -38,8 +38,8 @@ public void YarnLookAt(string gameObjectName) {
 }
 ```
 
-... but Mohair will NOT understand something like this
-:
+... but Mohair will NOT understand if you wrap around AddCommandHandler or if the C# function name isn't directly in the invocation. So if you want Mohair to work, then DO NOT do this:
+
 ```csharp
 void AddCmd(string yarnName, System.Action<string> handler) {
     runner.AddCommandHandler<string>(yarnName, handler);
