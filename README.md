@@ -1,6 +1,8 @@
 # mohair
 
-Mohair is a Unity Editor tool that uses Roslyn code analysis (only syntax, not semantic) to automatically scan your C# code for Yarn Spinner commands and functions, and produce Markdown + HTML documentation.
+Mohair is a Unity Editor tool that uses Roslyn code analysis (only syntax, not semantic) to automatically scan your C# code for Yarn Spinner commands and functions, and produce Markdown + HTML documentation. 
+
+It takes your Yarn Command or Yarn Function binding, then looks at the underlying C# method and its associated code comments and 
 
 (TODO: show example documentation)
 
@@ -21,13 +23,24 @@ Mohair runs automatically every time your code recompiles. You can also force it
 
 By default, Mohair ignores C# scripts in any Packages, Editor, and or Tests folder. (TODO: let you customize what gets ignored)
 
-Keep in mind, the code analysis isn't very smart. It isn't compiling your code, so it can't find references or generate symbols. If your code isn't "flat" enough, this tool won't work very well. When adding command handlers or functions to the Dialogue Runner in Yarn Spinner Unity, do it in the simplest possible way. **Call `AddCommandHandler` or `AddFunction` once per binding, once per line. Avoid loops, recursion, delegates, etc.**
+Keep in mind, the code analysis isn't very smart. It isn't compiling your code, so it can't find references or generate symbols. If your code isn't "flat" enough, this tool won't work very well. When adding command handlers or functions to the Dialogue Runner in Yarn Spinner Unity, do it in the simplest possible way. 
+
+**Call `AddCommandHandler` or `AddFunction` once per binding, once per line. Avoid loops, recursion, delegates, etc.**
+
+Mohair can read a fairly flat code style like this:
 
 ```csharp
-// Mohair can read this:
 runner.AddCommandHandler<string>("lookAt", YarnLookAt); 
 
-// but Mohair will NOT understand this:
+/// <summary>make the character look at the named gameObject</summary>
+public void YarnLookAt(string gameObjectName) {
+    Camera.main.transform.LookAt( GameObject.Find(gameObjectName) );
+}
+```
+
+... but Mohair will NOT understand something like this
+:
+```csharp
 void AddCmd(string yarnName, System.Action<string> handler) {
     runner.AddCommandHandler<string>(yarnName, handler);
 }
