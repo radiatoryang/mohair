@@ -319,7 +319,7 @@ public class MohairCore
             }
         }
 
-        string callstack { get { return $"`{cSharpClass}.{cSharpName}() ` { (string.IsNullOrEmpty(region) ? "" : $" in ` #region {region}`") }"; } }
+        string callstack { get { return $"{cSharpClass}.{cSharpName}() { (string.IsNullOrEmpty(region) ? "" : $" in #region {region}") }"; } }
         string signature { get { return $"<!-- {prefix}{yarnName}{GetParamsAndSuffix(paramStringTemplateRaw)} -->  <pre>{prefix}<b>{yarnName}</b>{GetParamsAndSuffix(paramStringTemplateFormatted)}</pre>"; } }
 
         public MohairEntry(EntryType type, string yarnName, string cSharpName, List<string> parameterTypes)
@@ -336,7 +336,7 @@ public class MohairCore
         }
 
         public string ToStringTOC() {
-            return $"|[`{prefix}{yarnName}{suffix}`](#{yarnName})     |{ (string.IsNullOrEmpty(comment) ? "" : comment.Substring(0, Mathf.Min(70, comment.Length)).Replace('\n', ' ').Replace('\r', ' ') ) }     |\n";
+            return $"|[`{prefix}{yarnName}{suffix}`](#{yarnName})     |{(string.IsNullOrEmpty(region) ? "" : $"**(#{region.ToLowerInvariant()})**")} { (string.IsNullOrEmpty(comment) ? "" : comment.Substring(0, Mathf.Min(70, comment.Length)).Replace('`', ' ').Replace('\n', ' ').Replace('\r', ' ') ) }     |\n";
         }
     }
 
