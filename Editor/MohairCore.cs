@@ -15,9 +15,19 @@ using Markdig;
 public class MohairCore
 {
     static string filePath = "/Dialogue/YarnDocumentation";
+    static System.Text.Encoding encoding = System.Text.Encoding.UTF8;
 
-    [MenuItem("Assets/Mohair/Force Regenerate Yarn Documentation"), UnityEditor.Callbacks.DidReloadScripts]
-    public static void GenerateYarnDocumentation() {
+    [MenuItem("Assets/Mohair/Force Regenerate Yarn Documentation")]
+    public static void MenuGenerateYarnDocumentation() {
+        GenerateYarnDocumentation( forceRegenerate:true );
+    }
+
+    [UnityEditor.Callbacks.DidReloadScripts]
+    public static void AutoGenerateYarnDocumentation() {
+        GenerateYarnDocumentation();
+    }
+
+    public static void GenerateYarnDocumentation(bool forceRegenerate=false) {
         // var targets = Selection.GetFiltered<MonoScript>(SelectionMode.Assets);
         var targets = FindAssetsByType<MonoScript>("Script", "editor", "test", "package");
         
@@ -77,26 +87,35 @@ public class MohairCore
         }
 
         // grab template
-        var templateFile = AssetDatabase.LoadAssetAtPath<TextAsset>("Packages/com.radiatoryang.mohair/Editor/MohairTemplate.md");
-        var template = templateFile.text;
+        const string templateFilePath = "Packages/com.radiatoryang.mohair/Editor/MohairTemplate.md"; // TODO: make user configurable
+        var templateFile = AssetDatabase.LoadAssetAtPath<TextAsset>(templateFilePath);
+        var templateText = "";
+        if ( templateFile == null ) {
+            Debug.LogError($"Mohair couldn't load the Markdown template at {templateFilePath}. Sometimes this happens when you freshly install Mohair, but Unity hasn't imported the template file yet. In the Unity menu bar, use Assets > Mohair > Force Regenerate Documentation to try again. If this error persists, then the file is definitely missing or something.");
+        } else {
+            templateText = templateFile.text;
+        }
 
         var templateWebFile = AssetDatabase.LoadAssetAtPath<TextAsset>("Packages/com.radiatoryang.mohair/Editor/MohairTemplateWeb.html");
         var templateWeb = templateWebFile.text.Split(new string[] {"<!--CONTENT-->"}, System.StringSplitOptions.RemoveEmptyEntries );
 
         // output the finished reference
         string fullPath = Application.dataPath + filePath;
-        string markdown = string.Format(template, commandTOC, functionTOC, entries);
-        File.WriteAllText( fullPath + ".md", markdown );
-        var pipeline = new MarkdownPipelineBuilder().UsePipeTables().Build();
-        var html = templateWeb[0] + Markdown.ToHtml(markdown, pipeline) + templateWeb[1];
-        File.WriteAllText( fullPath + "Web.html", html);
-        if ( fullPath.StartsWith(Application.dataPath) ) {
-            AssetDatabase.ImportAsset("Assets" + filePath + ".md");
-            AssetDatabase.ImportAsset("Assets" + filePath + "Web.html");
-        }
+        string markdown = string.Format(templateText, commandTOC, functionTOC, entries);
 
-        Debug.Log($"Mohair successfully regenerated Yarn Documentation ({fullPath})");
-        // AssetDatabase.Refresh();
+        // but only follow through if the MD5 checksum of the old file is different from the checksum of the new file
+        if ( forceRegenerate || !File.Exists( fullPath + ".md" ) || Md5Sum(File.ReadAllText(fullPath + ".md", encoding)) != Md5Sum(markdown) ) {
+            File.WriteAllText( fullPath + ".md", markdown, encoding );
+            var pipeline = new MarkdownPipelineBuilder().UsePipeTables().Build();
+            var html = templateWeb[0] + Markdown.ToHtml(markdown, pipeline) + templateWeb[1];
+            File.WriteAllText( fullPath + "Web.html", html, encoding );
+            if ( fullPath.StartsWith(Application.dataPath) ) {
+                AssetDatabase.ImportAsset("Assets" + filePath + ".md");
+                AssetDatabase.ImportAsset("Assets" + filePath + "Web.html");
+            }
+            Debug.Log($"Mohair successfully regenerated Yarn Documentation ({fullPath})");
+        }
+        
     }
     public static List<MohairEntry> GetEntriesFromCode(string sourceCode, Dictionary<string, List<MohairMethod>> methods) {
         var tree = CSharpSyntaxTree.ParseText(sourceCode);
@@ -385,6 +404,27 @@ public class MohairCore
             }
         }
         return new string(array, 0, arrayIndex);
+    }
+
+    /// from https://github.com/MartinSchultz/unity3d/blob/master/CryptographyHelper.cs
+    /// <summary>
+    /// used to calculate file checksums so we can avoid unnecessary ImportAsset operations
+    /// </summary>
+    public static string Md5Sum(string fileText)
+    {
+        var bytes = encoding.GetBytes(fileText);
+
+        // encrypt bytes
+        System.Security.Cryptography.MD5CryptoServiceProvider md5 = new System.Security.Cryptography.MD5CryptoServiceProvider();
+        byte[] hashBytes = md5.ComputeHash(bytes);
+
+        // Convert the encrypted bytes back to a string (base 16)
+        string hashString = "";
+        for (int i = 0; i < hashBytes.Length; i++)
+        {
+            hashString += System.Convert.ToString(hashBytes[i], 16).PadLeft(2, "0"[0]);
+        }
+        return hashString.PadLeft(32, "0"[0]);
     }
 }
 
