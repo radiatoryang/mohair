@@ -15,7 +15,7 @@ Make sure you have the pre-reqs installed:
 
 Then install Mohair:
 - install via Git URL in Unity Package Manager (recommended)
-- or clone the submodule in a subfolder of /Assets/ or /Packages/ in your Unity project, e.g. /Assets/Mohair/
+- or if you know what you're doing, init as a submodule in /Packages/com.radiatoryang.mohair/ or whatever
 
 ## usage
 
