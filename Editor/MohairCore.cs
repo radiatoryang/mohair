@@ -12,10 +12,13 @@ using Yarn.Unity;
 
 using Markdig;
 
+namespace Mohair {
+
+/// <summary>a mostly static class for handling core Mohair processing functions</summary>
 public class MohairCore
 {
-    static string filePath = "/Dialogue/YarnDocumentation";
-    static System.Text.Encoding encoding = System.Text.Encoding.UTF8;
+    // static string filePath { get { return MohairSettingsProvider.Settings.documentationFilePath;} }
+    static System.Text.Encoding encoding { get { return MohairSettingsProvider.Settings.encoding;} }
 
     [MenuItem("Assets/Mohair/Force Regenerate Yarn Documentation")]
     public static void MenuGenerateYarnDocumentation() {
@@ -27,18 +30,18 @@ public class MohairCore
         GenerateYarnDocumentation();
     }
 
+    /// <summary>main documentation generator function, whether automatically called or manually called</summary>
     public static void GenerateYarnDocumentation(bool forceRegenerate=false) {
-        // var targets = Selection.GetFiltered<MonoScript>(SelectionMode.Assets);
-        var targets = FindAssetsByType<MonoScript>("Script", "editor", "test", "package");
+        // gather all .cs C# files, while ignoring anything with "cSharpIgnore" in the file path
+        var targets = FindAssetsByType<MonoScript>("Script", MohairSettingsProvider.Settings.cSharpIgnore);
         
         var newEntries = new List<MohairEntry>();
         var methods = new Dictionary<string, List<MohairMethod>>();
 
         foreach ( var target in targets ) {
-        //    Debug.Log( target.name );
+        //  Debug.Log( target.name );
             newEntries.AddRange( GetEntriesFromCode(target.text, methods) );
         }
-        // newEntries.AddRange( GetYarnCommandsFromAttributes() );
 
         // foreach ( var entry in newEntries ) {
         //     // Debug.Log( entry.ToString() );
@@ -66,8 +69,7 @@ public class MohairCore
         var commands = newEntries.Where( entry => entry.entryType != MohairEntry.EntryType.Function ).OrderBy(entry => entry.region).ThenBy( entry => entry.yarnName ).ToList();
         var functions = newEntries.Where( entry => entry.entryType == MohairEntry.EntryType.Function ).OrderBy(entry => entry.region).ThenBy(entry => entry.yarnName ).ToList();
 
-        // generate TOC
-
+        // generate Table of Contents
         string commandTOC = "";
         foreach ( var entry in commands ) {
             commandTOC += entry.ToStringTOC();
@@ -79,53 +81,96 @@ public class MohairCore
         }
 
         // generate full command list
-
         newEntries = newEntries.OrderBy( entry => entry.yarnName ).ToList();
         string entries = "";
         foreach ( var entry in newEntries ) {
             entries += entry.ToString();
         }
 
-        // grab template
-        const string templateFilePath = "Packages/com.radiatoryang.mohair/Editor/MohairTemplate.md"; // TODO: make user configurable
-        var templateFile = AssetDatabase.LoadAssetAtPath<TextAsset>(templateFilePath);
-        var templateText = "";
-        if ( templateFile == null ) {
-            Debug.LogError($"Mohair couldn't load the Markdown template at {templateFilePath}. Sometimes this happens when you freshly install Mohair, but Unity hasn't imported the template file yet. In the Unity menu bar, use Assets > Mohair > Force Regenerate Documentation to try again. If this error persists, then the file is definitely missing or something.");
-        } else {
-            templateText = templateFile.text;
+        // grab markdown template
+        if ( string.IsNullOrEmpty(MohairSettingsProvider.Settings.markdownTemplateFilePath) ) {
+            Debug.LogError("Mohair couldn't load the Markdown template file because the file path is empty. Please configure the file path in Project Settings > Mohair.");
         }
-
-        var templateWebFile = AssetDatabase.LoadAssetAtPath<TextAsset>("Packages/com.radiatoryang.mohair/Editor/MohairTemplateWeb.html");
-        var templateWeb = templateWebFile.text.Split(new string[] {"<!--CONTENT-->"}, System.StringSplitOptions.RemoveEmptyEntries );
+        var templateText = LoadTemplate( MohairSettingsProvider.Settings.markdownTemplateFilePath, MohairSettingsProvider.Settings.markdownTemplateFilePathFull );
+        if ( string.IsNullOrEmpty(templateText) ) {
+            Debug.LogError($"Mohair couldn't load the Markdown template at {MohairSettingsProvider.Settings.markdownTemplateFilePath}. Sometimes this happens when you freshly install Mohair, but Unity hasn't imported the template file yet. In the Unity menu bar, use Assets > Mohair > Force Regenerate Documentation to try again. If this error persists, then the file is definitely missing or something.");
+            return;
+        }
 
         // output the finished reference
-        string fullPath = Application.dataPath + filePath;
         string markdown = string.Format(templateText, commandTOC, functionTOC, entries);
 
-        // but only follow through if the MD5 checksum of the old file is different from the checksum of the new file
-        if ( forceRegenerate || !File.Exists( fullPath + ".md" ) || Md5Sum(File.ReadAllText(fullPath + ".md", encoding)) != Md5Sum(markdown) ) {
-            File.WriteAllText( fullPath + ".md", markdown, encoding );
-            var pipeline = new MarkdownPipelineBuilder().UsePipeTables().Build();
-            var html = templateWeb[0] + Markdown.ToHtml(markdown, pipeline) + templateWeb[1];
-            File.WriteAllText( fullPath + "Web.html", html, encoding );
-            if ( fullPath.StartsWith(Application.dataPath) ) {
-                AssetDatabase.ImportAsset("Assets" + filePath + ".md");
-                AssetDatabase.ImportAsset("Assets" + filePath + "Web.html");
+        // but only write the files if the MD5 checksum of the old file is different from the checksum of the new file
+        if ( forceRegenerate == true
+            || !File.Exists( MohairSettingsProvider.Settings.markdownFilePathFull ) 
+            || Md5Sum(File.ReadAllText(MohairSettingsProvider.Settings.markdownFilePathFull, encoding)) != Md5Sum(markdown) 
+        ) {
+            // write the markdown file
+            File.WriteAllText( MohairSettingsProvider.Settings.markdownFilePathFull, markdown, encoding );
+            if ( MohairSettingsProvider.Settings.markdownFilePathFull.StartsWith(Application.dataPath) ) {
+                AssetDatabase.ImportAsset(MohairSettingsProvider.Settings.markdownFilePath);
             }
-            Debug.Log($"Mohair successfully regenerated Yarn Documentation ({fullPath})");
+            string resultLog = MohairSettingsProvider.Settings.markdownFilePathFull;
+
+            // get web template, do web export
+            if ( string.IsNullOrEmpty(MohairSettingsProvider.Settings.htmlTemplateFilePath) == false) {
+                var templateWeb = LoadTemplate( MohairSettingsProvider.Settings.htmlTemplateFilePath, MohairSettingsProvider.Settings.htmlTemplateFilePathFull );
+                if ( string.IsNullOrEmpty(templateWeb) ) {
+                    Debug.LogWarning($"Mohair couldn't load the HTML template at {MohairSettingsProvider.Settings.htmlTemplateFilePath}. Sometimes this happens when you freshly install Mohair, but Unity hasn't imported the template file yet. In the Unity menu bar, use Assets > Mohair > Force Regenerate Documentation to try again. If this error persists, then the file is definitely missing or something.");
+                } else {
+                    var templateWebSplit = templateWeb.Split(new string[] {"<!--CONTENT-->"}, System.StringSplitOptions.RemoveEmptyEntries );
+                    if ( templateWebSplit.Length < 2 ) {
+                        Debug.LogError($"Mohair couldn't generate the HTML documentation because the HTML template does not contain '<!--CONTENT-->' marker... make sure it has that marker, spelled exactly, in the template file!");
+                    }
+                    var pipeline = new MarkdownPipelineBuilder().UsePipeTables().Build();
+                    var html = templateWeb[0] + Markdown.ToHtml(markdown, pipeline) + templateWeb[1];
+
+                    File.WriteAllText( MohairSettingsProvider.Settings.htmlFilePathFull, html, encoding );
+                    if ( MohairSettingsProvider.Settings.htmlFilePathFull.StartsWith(Application.dataPath) ) {
+                        AssetDatabase.ImportAsset(MohairSettingsProvider.Settings.htmlFilePath);
+                    }
+                    resultLog += ", " + MohairSettingsProvider.Settings.htmlFilePathFull;
+                }
+            }   
+
+            Debug.Log($"Mohair regenerated Yarn Documentation! ({resultLog})");
         }
-        
+
     }
+
+    /// <summary>utility function to handle Unity's weird file handling rules</summary>
+    static string LoadTemplate(string filepath, string filepathFull) {
+        // files for Packages are best resolved via AssetDatabase, since the actual package files are secretly stored in Library package cache
+        if ( filepath.StartsWith("Packages") ) { 
+            var templateFile = AssetDatabase.LoadAssetAtPath<TextAsset>(filepath);
+            if ( templateFile == null ) {
+                AssetDatabase.ImportAsset(filepath);
+                AssetDatabase.Refresh();
+                templateFile = AssetDatabase.LoadAssetAtPath<TextAsset>(filepath);
+                if ( templateFile == null ) {
+                    return "";
+                } else {
+                    return templateFile.text;
+                }
+            } else {
+                return templateFile.text;
+            }
+        } else { // otherwise, let's bypass the AssetDatabase and just read the template file directly
+            if ( File.Exists(filepathFull) ) {
+                return File.ReadAllText( filepathFull, MohairSettingsProvider.Settings.encoding );
+            } else {
+                return "";
+            }
+        }
+    }
+
+    /// <summary>main code analysis function</summary>
     public static List<MohairEntry> GetEntriesFromCode(string sourceCode, Dictionary<string, List<MohairMethod>> methods) {
         var tree = CSharpSyntaxTree.ParseText(sourceCode);
         var root = tree.GetRoot();
 
         var visitor = new MohairVisitor();
         visitor.Visit(root);
-
-        // entries.AddRange( visitor.entries );
-       //  Debug.Log(visitor.entries.Count);
 
         foreach ( var kvp in visitor.methods ) {
             if ( methods.ContainsKey(kvp.Key) ) {
@@ -138,27 +183,17 @@ public class MohairCore
         return visitor.entries;
     }
 
+    /// <summary>the visitor / walker object that traverses the CSharpSyntaxTree</summary>
     public class MohairVisitor : CSharpSyntaxWalker {
         public List<MohairEntry> entries = new List<MohairEntry>();
         public Dictionary<string, List<MohairMethod>> methods = new Dictionary<string, List<MohairMethod>>();
-
-        // string inClass = "";
         string inRegion = "";
 
-        public MohairVisitor() : base(SyntaxWalkerDepth.StructuredTrivia)
-        {
-        }
-
-        // public override void VisitClassDeclaration(ClassDeclarationSyntax node)
-        // {
-        //     inClass = node.Identifier.Text;
-        //     base.VisitClassDeclaration(node);
-        // }
+        public MohairVisitor() : base(SyntaxWalkerDepth.StructuredTrivia) { }
 
         public override void VisitRegionDirectiveTrivia(RegionDirectiveTriviaSyntax node)
         {
             inRegion = node.ToString();
-            // Debug.Log(inRegion);
             base.VisitRegionDirectiveTrivia(node);
         }
 
@@ -428,3 +463,4 @@ public class MohairCore
     }
 }
 
+}
